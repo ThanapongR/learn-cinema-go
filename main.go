@@ -14,7 +14,7 @@ import (
 type Movie struct {
 	ID          int64   `json:"id"`
 	ImdbID      string  `json:"imdbID"`
-	Title       string  `json:"titel"`
+	Title       string  `json:"title"`
 	Year        int     `json:"year"`
 	Rating      float32 `json:"rating"`
 	IsSuperHero bool    `json:"isSuperHero"`
@@ -91,6 +91,39 @@ func getMovieByIdHandler(c echo.Context) error {
 		return c.JSON(http.StatusOK, m)
 	case err == sql.ErrNoRows:
 		return c.JSON(http.StatusConflict, "movie not found")
+	default:
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+}
+
+func updateMovieByIdHandler(c echo.Context) error {
+	imdbID := c.Param("imdbID")
+
+	m := Movie{}
+
+	err := c.Bind(&m)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error)
+	}
+	m.ImdbID = imdbID
+
+	stmt, err := db.Prepare(`
+	UPDATE iDB SET title=?, year=?, rating=?, isSuperHero=? WHERE imdbID=?;
+	`)
+	defer func() {
+		_ = stmt.Close()
+	}()
+
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+
+	_, err = stmt.Exec(m.Title, m.Year, m.Rating, strconv.FormatBool(m.IsSuperHero), m.ImdbID)
+
+	switch {
+	case err == nil:
+		m.ID = -1
+		return c.JSON(http.StatusOK, m)
 	default:
 		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
@@ -173,6 +206,7 @@ func main() {
 
 	e.GET("/movies", getAllMoviesHandler)
 	e.GET("/movies/:imdbID", getMovieByIdHandler)
+	e.PUT("/movies/:imdbID", updateMovieByIdHandler)
 
 	e.POST("/movies", createMovieHandler)
 
