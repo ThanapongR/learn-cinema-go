@@ -27,6 +27,14 @@ var movies = []Movie{
 	},
 }
 
+// {
+// 	"imdbID": "tt1825683",
+// 	"titel": "Black Panther",
+// 	"year": 2018,
+// 	"rating": 7.3,
+// 	"isSuperHero": true
+// }
+
 func getAllMoviesHandler(c echo.Context) error {
 	y := c.QueryParam("year")
 
@@ -63,6 +71,19 @@ func getMovieByIdHandler(c echo.Context) error {
 	return c.JSON(http.StatusNotFound, map[string]string{"message": "not found"})
 }
 
+func createMovieHandler(c echo.Context) error {
+	m := &Movie{}
+
+	err := c.Bind(m)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error)
+	}
+
+	movies = append(movies, *m)
+
+	return c.JSON(http.StatusCreated, *m)
+}
+
 func main() {
 	fmt.Println("Welcome to iCinema")
 
@@ -70,6 +91,8 @@ func main() {
 
 	e.GET("/movies", getAllMoviesHandler)
 	e.GET("/movies/:id", getMovieByIdHandler)
+
+	e.POST("/movies", createMovieHandler)
 
 	port := "80"
 	log.Println("Start at port:" + port)
