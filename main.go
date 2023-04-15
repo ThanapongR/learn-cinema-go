@@ -20,58 +20,80 @@ type Movie struct {
 	IsSuperHero bool    `json:"isSuperHero"`
 }
 
-var movies = []Movie{
-	{
-		ImdbID:      "tt4154796",
-		Title:       "Avenger: Endgame",
-		Year:        2019,
-		Rating:      8.4,
-		IsSuperHero: true,
-	},
-}
-
-// {
-// 	"imdbID": "tt1825683",
-// 	"titel": "Black Panther",
-// 	"year": 2018,
-// 	"rating": 7.3,
-// 	"isSuperHero": true
-// }
-
 func getAllMoviesHandler(c echo.Context) error {
 	y := c.QueryParam("year")
 
 	if y == "" {
-		return c.JSON(http.StatusOK, movies)
-	}
+		ms := []Movie{}
+		rows, err := db.Query(`SELECT id, imdbID, title, year, rating, isSuperHero FROM iDB`)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, err.Error())
+		}
+		defer rows.Close()
 
-	year, err := strconv.Atoi(y)
+		for rows.Next() {
+			var m Movie
 
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, err.Error())
-	}
+			if err := rows.Scan(&m.ID, &m.ImdbID, &m.Title, &m.Year, &m.Rating, &m.IsSuperHero); err != nil {
+				return c.JSON(http.StatusInternalServerError, err.Error())
+			}
 
-	ms := []Movie{}
-
-	for _, m := range movies {
-		if year == m.Year {
 			ms = append(ms, m)
 		}
-	}
 
-	return c.JSON(http.StatusOK, ms)
+		if err := rows.Err(); err != nil {
+			return c.JSON(http.StatusInternalServerError, err.Error())
+		}
+
+		return c.JSON(http.StatusOK, ms)
+	} else {
+		year, err := strconv.Atoi(y)
+
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, err.Error())
+		}
+
+		ms := []Movie{}
+		rows, err := db.Query(`SELECT id, imdbID, title, year, rating, isSuperHero FROM iDB WHERE year=?`, year)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, err.Error())
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var m Movie
+
+			if err := rows.Scan(&m.ID, &m.ImdbID, &m.Title, &m.Year, &m.Rating, &m.IsSuperHero); err != nil {
+				return c.JSON(http.StatusInternalServerError, err.Error())
+			}
+
+			ms = append(ms, m)
+		}
+
+		if err := rows.Err(); err != nil {
+			return c.JSON(http.StatusInternalServerError, err.Error())
+		}
+
+		return c.JSON(http.StatusOK, ms)
+	}
 }
 
 func getMovieByIdHandler(c echo.Context) error {
-	id := c.Param("id")
+	imdbID := c.Param("imdbID")
 
-	for _, m := range movies {
-		if m.ImdbID == id {
-			return c.JSON(http.StatusOK, m)
-		}
+	row := db.QueryRow(`SELECT id, imdbID, title, year, rating, isSuperHero FROM iDB WHERE imdbID=?`, imdbID)
+
+	m := Movie{}
+	err := row.Scan(&m.ID, &m.ImdbID, &m.Title, &m.Year, &m.Rating, &m.IsSuperHero)
+
+	switch {
+	case err == nil:
+		return c.JSON(http.StatusOK, m)
+	case err == sql.ErrNoRows:
+		return c.JSON(http.StatusConflict, "movie not found")
+	default:
+		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
-
-	return c.JSON(http.StatusNotFound, map[string]string{"message": "not found"})
 }
 
 func createMovieHandler(c echo.Context) error {
@@ -150,7 +172,7 @@ func main() {
 	e := echo.New()
 
 	e.GET("/movies", getAllMoviesHandler)
-	e.GET("/movies/:id", getMovieByIdHandler)
+	e.GET("/movies/:imdbID", getMovieByIdHandler)
 
 	e.POST("/movies", createMovieHandler)
 
