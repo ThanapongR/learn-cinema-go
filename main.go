@@ -12,6 +12,7 @@ import (
 )
 
 type Movie struct {
+	ID          int64   `json:"id"`
 	ImdbID      string  `json:"imdbID"`
 	Title       string  `json:"titel"`
 	Year        int     `json:"year"`
@@ -74,16 +75,41 @@ func getMovieByIdHandler(c echo.Context) error {
 }
 
 func createMovieHandler(c echo.Context) error {
-	m := &Movie{}
+	m := Movie{}
 
-	err := c.Bind(m)
+	err := c.Bind(&m)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, err.Error)
 	}
 
-	movies = append(movies, *m)
+	stmt, err := db.Prepare(`
+	INSERT INTO iDB (imdbID, title, year, rating, isSuperHero)
+	VALUES (?, ?, ?, ?, ?);
+	`)
+	defer func() {
+		_ = stmt.Close()
+	}()
 
-	return c.JSON(http.StatusCreated, *m)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+
+	res, err := stmt.Exec(m.ImdbID, m.Title, m.Year, m.Rating, strconv.FormatBool(m.IsSuperHero))
+
+	switch {
+	case err == nil:
+		var id int64
+		id, err = res.LastInsertId()
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, err.Error())
+		}
+		m.ID = id
+		return c.JSON(http.StatusCreated, m)
+	case err.Error() == "UNIQUE constraint violation":
+		return c.JSON(http.StatusConflict, "movie already exists")
+	default:
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
 }
 
 var db *sql.DB
