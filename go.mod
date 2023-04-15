@@ -2,7 +2,10 @@ module github.com/ThanapongR/iCinema
 
 go 1.20
 
-require github.com/labstack/echo/v4 v4.10.2
+require (
+	github.com/labstack/echo/v4 v4.10.2
+	github.com/proullon/ramsql v0.0.0-20230224205054-8ff679dbf7aa
+)
 
 require (
 	github.com/labstack/gommon v0.4.0 // indirect

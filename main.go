@@ -1,12 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
+	_ "github.com/proullon/ramsql/driver"
 )
 
 type Movie struct {
@@ -84,8 +86,40 @@ func createMovieHandler(c echo.Context) error {
 	return c.JSON(http.StatusCreated, *m)
 }
 
+var db *sql.DB
+
+func conn() {
+	var err error
+	db, err = sql.Open("ramsql", "iDB")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
 	fmt.Println("Welcome to iCinema")
+
+	conn()
+
+	createTb := `
+	CREATE TABLE IF NOT EXISTS iDB (
+	id INT AUTO_INCREMENT,
+	imdbID TEXT NOT NULL UNIQUE,
+	title TEXT NOT NULL,
+	year INT NOT NULL,
+	rating FLOAT NOT NULL,
+	isSuperHero BOOLEAN NOT NULL,
+	PRIMARY KEY (id)
+	);
+	`
+
+	if _, err := db.Exec(createTb); err != nil {
+		log.Fatal("Create table error", err)
+	}
 
 	e := echo.New()
 
